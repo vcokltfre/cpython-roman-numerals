@@ -3077,6 +3077,10 @@ PyLong_FromString(const char *str, char **pend, int base)
         else if (str[1] == 'b' || str[1] == 'B') {
             base = 2;
         }
+        else if (str[1] == 'r' || str[1] == 'R') {
+            /* Roman numeral */
+            base = -1;
+        }
         else {
             /* "old" (C-style) octal literal, now invalid.
                it might still be zero though */
@@ -3084,6 +3088,60 @@ PyLong_FromString(const char *str, char **pend, int base)
             base = 10;
         }
     }
+
+    if (base == -1 && str[0] == '0' && (str[1] == 'r' || str[1] == 'R')) {
+        str += 2;  /* skip 0r or 0R */
+        while (*str == '_')  /* skip optional underscore(s) */
+            str++;
+
+        /* convert roman numeral string to integer */
+        long value = 0;
+        int last = 0, curr = 0;
+        const char *p = str;
+
+        /* ensure there's at least one roman digit */
+        if (!*p || strchr("IVXLCDMivxlcdm", *p) == NULL) {
+            PyErr_SetString(PyExc_ValueError,
+                "invalid literal for int() with base 0r (no Roman numerals)");
+            if (pend) *pend = (char *)str;
+            return NULL;
+        }
+
+        /* first, find end of valid roman sequence */
+        while (*p && strchr("IVXLCDMivxlcdm", *p)) {
+            p++;
+        }
+
+        const char *end = p;
+        while (p > str) {
+            p--;
+            switch (Py_TOUPPER(*p)) {
+                case 'I': curr = 1; break;
+                case 'V': curr = 5; break;
+                case 'X': curr = 10; break;
+                case 'L': curr = 50; break;
+                case 'C': curr = 100; break;
+                case 'D': curr = 500; break;
+                case 'M': curr = 1000; break;
+                default: curr = 0; break;
+            }
+            if (curr < last)
+                value -= curr;
+            else {
+                value += curr;
+                last = curr;
+            }
+        }
+
+        if (sign < 0)
+            value = -value;
+
+        z = (PyLongObject *) PyLong_FromLong(value);
+        if (pend)
+            *pend = (char *)end;
+        return (PyObject *)z;
+    }
+
     if (str[0] == '0' &&
         ((base == 16 && (str[1] == 'x' || str[1] == 'X')) ||
          (base == 8  && (str[1] == 'o' || str[1] == 'O')) ||

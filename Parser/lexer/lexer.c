@@ -874,6 +874,27 @@ tok_get_normal_mode(struct tok_state *tok, tokenizer_mode* current_tok, struct t
                     return MAKE_TOKEN(ERRORTOKEN);
                 }
             }
+            else if (c == 'r' || c == 'R') {
+                /* Roman numerals */
+                c = tok_nextc(tok);
+                do {
+                    if (c == '_') {
+                        c = tok_nextc(tok);
+                    }
+                    if (c != 'I' && c != 'V' && c != 'X' && c != 'L' &&
+                        c != 'C' && c != 'D' && c != 'M') {
+                        tok_backup(tok, c);
+                        return MAKE_TOKEN(_PyTokenizer_syntaxerror(tok, "invalid roman numeral literal"));
+                    }
+                    do {
+                        c = tok_nextc(tok);
+                    } while (c == 'I' || c == 'V' || c == 'X' || c == 'L' ||
+                             c == 'C' || c == 'D' || c == 'M');
+                } while (c == '_');
+                if (!verify_end_of_number(tok, c, "roman numeral")) {
+                    return MAKE_TOKEN(ERRORTOKEN);
+                }
+            }
             else if (c == 'o' || c == 'O') {
                 /* Octal */
                 c = tok_nextc(tok);
